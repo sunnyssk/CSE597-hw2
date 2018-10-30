@@ -5,11 +5,11 @@
 #include "mpi_util.h"
 #include "matrix_mpi.h"
 
-class MField3D {
+class MDebyeSolver {
 public:
     
 protected:
-    MMatD
+    MMatD* pAmat_;
 };
 
 #endif /* _DEBYE_MPI_H_ */
