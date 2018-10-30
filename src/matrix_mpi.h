@@ -1,6 +1,7 @@
 #ifndef _MATRIX_MPI_H_
 #define _MATRIX_MPI_H_
 
+#include <iostream>
 #include "mpi_util.h"
 
 // Matrices are stored piecewise in processes, with (slice_size_) rows each piece.
@@ -8,15 +9,7 @@
 
 template <typename T> class MMat {
 public:
-    MMat (int rows, int cols) : rows_(rows),
-                                cols_(cols),
-                                slice_rows_(rows / mpi_size_),
-                                slice_offset_(slice_rows_ * mpi_rank_),
-                                buffer_(nullptr) {
-                                    slice_rows_ = rows % slice_rows_;
-                                    buffer_ = new T[slice_rows_ * cols_];
-                                }
-
+    MMat (int rows, int cols);
     ~MMat () { delete[] buffer_; }
 
     static void Init (int mpi_size, int mpi_rank);
@@ -25,13 +18,13 @@ public:
     int Cols() const { return cols_; }
     int SliceRows() const { return slice_rows_; }
     int SliceOffset() const { return slice_offset_; }
-    T const * const ReadOnlyBuffer() const { return buffer_; }
-    T * const Buffer() { return buffer_; }
+    T * Buffer() { return buffer_; }
 
-    T& operator () (int slice_row, int col) { return buffer_[slice_row * cols_ + col]; }
-    const T& operator () (int slice_row, int col) const { return buffer_[slice_row * cols_ + col]; }
-
-
+    T& SliceElem (int slice_row, int col) { return buffer_[slice_row * cols_ + col]; }
+    const T& SliceElem (int slice_row, int col) const { return buffer_[slice_row * cols_ + col]; }
+    T GetVal (int row, int col) const;
+    
+    void PrintMatrix (std::ostream output_stream);
 protected:
     static int mpi_size_;
     static int mpi_rank_;
