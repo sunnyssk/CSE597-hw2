@@ -21,10 +21,13 @@ public:
     int SliceOffset() const { return slice_offset_; }
     T * Buffer() { return buffer_; }
 
+    // Gets the element in current process.
     T& Elem (int slice_row, int col) { return buffer_[slice_row * cols_ + col]; }
     const T& Elem (int slice_row, int col) const { return buffer_[slice_row * cols_ + col]; }
+    // [Aligned] Gets the value of a certain element in matrix and broadcast it to all processes.
     T GetVal (int row, int col) const;
     
+    // [Aligned] Print the matrix to the output stream specified.
     void Print (std::ostream& output_stream) const;
 
 protected:
