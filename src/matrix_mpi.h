@@ -2,6 +2,7 @@
 #define _MATRIX_MPI_H_
 
 #include <iostream>
+#include <cstring>
 #include "mpi_util.h"
 
 // Matrices are stored piecewise in processes, with (slice_rows_) rows each piece.

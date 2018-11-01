@@ -5,6 +5,10 @@
 #include "mpi_util.h"
 #include "matrix_mpi.h"
 
+#ifndef MAX_ITER_NUM
+    #define MAX_ITER_NUM (10000)
+#endif
+
 class MField3D{
 public:
     MField3D (int nx, int ny, int nz, double dx, double dy, double dz, int mpi_size, int mpi_rank);
@@ -37,12 +41,15 @@ class MDebyeSolver {
 public:
 
     void GenerateSolverMatrix (MField3D const & rhs, double debye_length);
+    int JacobiIterativeSolve (double err_threshold, MField3D & res_container, double * iter_err_array);
+    void RhsInput (MField3D const & field);
     
 protected:
     int mpi_size_;
     int mpi_rank_;
 
-    MMatD* pAmat_;
+    MMatD * pAmat_;
+    double * pfield_;
 };
 
 #endif /* _DEBYE_MPI_H_ */

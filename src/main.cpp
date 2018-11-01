@@ -20,6 +20,7 @@ int main (int argc, char** argv) {
             for(int j = 0; j < cols; j++) A.Elem(i, j) = cols * (A.SliceOffset() + i) + j;
     }
     std::cout << "Rows on process # " << mpi_rank << ": " << A.SliceRows() << std::endl;
+    std::cout << "Offset on process # " << mpi_rank << ": " << A.SliceOffset() << std::endl;
     A.Print(std::cout);
 
     MMatD::Clean();
