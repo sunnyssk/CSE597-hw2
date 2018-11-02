@@ -90,6 +90,7 @@ int MDebyeSolver::JacobiIterativeSolve (double err_threshold, MField3D & res_con
             for (int k = 1; k <= nztrim; k++) x_prev[TRI(i, j, k)] = res_container(i, j, k);
     #undef TRI
 
+    MPI_Barrier(MPI_COMM_WORLD);
     // Iterative solver
     do {
         errmax = 0.0;
@@ -99,9 +100,10 @@ int MDebyeSolver::JacobiIterativeSolve (double err_threshold, MField3D & res_con
         }
         for (int i = slice_offset; i < slice_offset + slice_rows; i++) {
             x_next[i] = pfield_[i];
-            for (int j = 0; j < i; j++) x_next[i] -= pAmat_->Elem(i, j) * x_prev[j];
-            for (int j = i + 1; j < ntrim; j++) x_next[i] -= pAmat_->Elem(i, j) * x_prev[j];
-            x_next[i] /= pAmat_->Elem(i, i);
+            int slice_i = i - slice_offset;
+            for (int j = 0; j < i; j++) x_next[i] -= pAmat_->Elem(slice_i, j) * x_prev[j];
+            for (int j = i + 1; j < ntrim; j++) x_next[i] -= pAmat_->Elem(slice_i, j) * x_prev[j];
+            x_next[i] /= pAmat_->Elem(slice_i, i);
             double newerr = fabs(x_next[i] - x_prev[i]);
             errmax = errmax > newerr ? errmax : newerr;
         }
@@ -116,6 +118,7 @@ int MDebyeSolver::JacobiIterativeSolve (double err_threshold, MField3D & res_con
     } while (errmax >= err_threshold || aux_vector1 == x_next);                 // only exits iteration when the original field is updated
 
     #define TRI(i, j, k) (((k) - 1) * nltrim + ((j) - 1) * nxtrim + (i) - 1)    // trimmed indices
+    MPI_Barrier(MPI_COMM_WORLD);
     for (int i = 1; i <= nxtrim; i++)
         for (int j = 1; j <= nytrim; j++)
             for (int k = 1; k <= nztrim; k++) res_container(i, j, k) = x_next[TRI(i, j, k)];
