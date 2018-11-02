@@ -3,6 +3,7 @@
 template <typename T> int MMat<T>::mpi_rank_;
 template <typename T> int MMat<T>::mpi_size_;
 template <typename T> MPI_Datatype MMat<T>::mpi_type_;
+template <typename T> bool MMat<T>::initialized_ = false;
 
 template <typename T> MMat<T>::MMat (int rows, int cols) : 
 rows_(rows), cols_(cols), slice_rows_((rows - 1) / mpi_size_ + 1), slice_offset_(slice_rows_ * mpi_rank_), buffer_(nullptr) {
@@ -12,7 +13,10 @@ rows_(rows), cols_(cols), slice_rows_((rows - 1) / mpi_size_ + 1), slice_offset_
 }
 
 template <typename T> void MMat<T>::Clean () {
+    if (!initialized_) return;
+    // else :
     MPI_Type_free(&mpi_type_);
+    initialized_ = false;
 }
 
 template <typename T> T MMat<T>::GetVal (int row, int col) const {
@@ -28,8 +32,11 @@ template <typename T> T MMat<T>::GetVal (int row, int col) const {
 }
 
 template <typename T> void MMat<T>::Init (int mpi_size, int mpi_rank) {
+    if (initialized_) return;
+    // else :
     mpi_size_ = mpi_size;
     mpi_rank_ = mpi_rank;
+    initialized_ = true;
     MPI_Type_contiguous(sizeof(T), MPI_CHAR, &mpi_type_);
     MPI_Type_commit(&mpi_type_);
 }

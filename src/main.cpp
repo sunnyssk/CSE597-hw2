@@ -6,23 +6,36 @@
 #include <mpi.h>
 #include "mpi_util.h"
 #include "matrix_mpi.h"
+#include "debye_mpi.h"
 
 int main (int argc, char** argv) {
     int mpi_size = 0, mpi_rank = 0;
     MPIStart(mpi_size, mpi_rank);
     MMatD::Init(mpi_size, mpi_rank);
     
-    int rows = 9, cols = 4;
-    MMatD A(rows, cols);
-    int slice_rows = 0;
-    if ((slice_rows = A.SliceRows()) > 0) {
-        for(int i = 0; i < slice_rows; i++)
-            for(int j = 0; j < cols; j++) A.Elem(i, j) = cols * (A.SliceOffset() + i) + j;
-    }
-    std::cout << "Rows on process # " << mpi_rank << ": " << A.SliceRows() << std::endl;
-    std::cout << "Offset on process # " << mpi_rank << ": " << A.SliceOffset() << std::endl;
-    A.Print(std::cout);
+    int nx = 20, ny = 20, nz = 20;
+    double dl = 1E-9, debye_length = 2E-9;
+    double ee = 1.60217662E-19, e0 = 8.854187817E-12;
+    MField3D rhs(nx, ny, nz, dl, dl, dl, mpi_size, mpi_rank), potential(nx, ny, nz, dl, dl, dl, mpi_size, mpi_rank);
+    MDebyeSolver msolve(mpi_size, mpi_rank);
+    double *error_array = new double[MAX_ITER_NUM];
 
+    for (int i = 0; i < nx; i++) {
+        for (int j = 0; j < ny; j++) {
+            for (int k = 0; k < nz; k++) {
+                potential(i, j, k) = 0.0;
+                rhs(i, j, k) = 0.0;
+            }
+        }
+    }
+    rhs(nx / 2, ny / 2, nz / 2) = -10 * ee / (e0 * dl * dl * dl);               // -charge_density / epsilon
+    msolve.GenerateSolverMatrix(rhs, debye_length);
+    msolve.RhsInput(rhs);
+    msolve.JacobiIterativeSolve(1E-5, potential, error_array);
+    potential.MPIValueSync();
+    if (mpi_rank == 0) potential.WriteField("output/potential.txt");
+
+    delete[] error_array;
     MMatD::Clean();
     MPI_Finalize();
     return 0;

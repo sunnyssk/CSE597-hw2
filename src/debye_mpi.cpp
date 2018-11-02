@@ -1,8 +1,46 @@
 #include "debye_mpi.h"
 
 MField3D::MField3D (int nx, int ny, int nz, double dx, double dy, double dz, int mpi_size, int mpi_rank) :
-nx_(nx), ny_(ny), nz_(nz), dx_(dx), dy_(dy), dz_(dz) {
+nx_(nx), ny_(ny), nz_(nz), dx_(dx), dy_(dy), dz_(dz), mpi_size_(mpi_size), mpi_rank_(mpi_rank) {
+    n_ = nx_ * ny_ * nz_;
+    buffer_ = new double [n_];
+}
 
+void MField3D::ApplyDirichletCond () {
+    int nx = nx_, ny = ny_, nz = nz_;
+    for (int j = 0; j < ny; j++) {
+        for (int k = 0; k < nz; k++) {
+            (*this)(0, j, k) = 0.0;
+            (*this)(nx - 1, j, k) = 0.0;
+        }
+    }
+    for (int k = 0; k < nz; k++) {
+        for (int i = 0; i < nx; i++) {
+            (*this)(i, 0, k) = 0.0;
+            (*this)(i, ny - 1, k) = 0.0;
+        }
+    }
+    for (int i = 0; i < nx; i++) {
+        for (int j = 0; j < ny; j++) {
+            (*this)(i, j, 0) = 0.0;
+            (*this)(i, j, nz - 1) = 0.0;
+        }
+    }
+}
+
+void MField3D::MPIValueSync () {
+    MPIArraySync(buffer_, n_, mpi_size_, mpi_rank_);
+}
+
+void MField3D::WriteField (char const * filename) {
+    FILE *fout = fopen(filename, "w");
+    if (!fout) std::cout << "Cannot create the output file, please make sure you have access to writing at the specified path." << std::endl;
+    else {
+        fprintf(fout, "%d %d %d\n", nx_, ny_, nz_);
+        for (int i = 0; i < nx_; i++)
+            for (int j = 0; j < ny_; j++)
+                for (int k = 0; k < nz_; k++) fprintf(fout, "%lf\n", (*this)(i, j, k));
+    }
 }
 
 void MDebyeSolver::GenerateSolverMatrix (MField3D const & rhs, double debye_length) {
@@ -35,28 +73,27 @@ void MDebyeSolver::GenerateSolverMatrix (MField3D const & rhs, double debye_leng
     #undef TRI
 }
 
-int MDebyeSolver::JacobiIterativeSolve (double err_threshold, MField3D & res_container, double * iter_err_array) {
+int MDebyeSolver::JacobiIterativeSolve (double err_threshold, MField3D & res_container, double * iter_err_array, int max_iter_num) {
     int nx = res_container.Nx(), ny = res_container.Ny(), nz = res_container.Nz();
     int nxtrim = nx - 2, nytrim = ny - 2, nztrim = nz - 2, nltrim = nxtrim * nytrim, ntrim = nxtrim * nytrim * nztrim;
     int iter_cnt = 0;
-    int slice_rows = pAmat_->SliceRows(), slice_offset = pAmat->SliceOffset();
+    int slice_rows = pAmat_->SliceRows(), slice_offset = pAmat_->SliceOffset();
 
     double *aux_vector1 = new double[ntrim], *aux_vector2 = new double[ntrim];
     double *x_prev = aux_vector1, *x_next = aux_vector2;
-    MatD *b = pfield_;
     double errmax = 0.0;
 
     // Assign the initial guess to the input vector
     #define TRI(i, j, k) (((k) - 1) * nltrim + ((j) - 1) * nxtrim + (i) - 1)    // trimmed indices
     for (int i = 1; i <= nxtrim; i++)
         for (int j = 1; j <= nytrim; j++)
-            for (int k = 1; k <= nztrim; k++) (*x_prev)(TRI(i, j, k)) = res_container.GetVal(i, j, k);
+            for (int k = 1; k <= nztrim; k++) x_prev[TRI(i, j, k)] = res_container(i, j, k);
     #undef TRI
 
     // Iterative solver
     do {
         errmax = 0.0;
-        if (iter_cnt++ >= MAX_ITER_NUM - 1) {
+        if (iter_cnt++ >= max_iter_num - 1) {
             std::cout << "Iteration number exceeds limit! Exit automatically." << std::endl;
             break;
         }
@@ -68,34 +105,35 @@ int MDebyeSolver::JacobiIterativeSolve (double err_threshold, MField3D & res_con
             double newerr = fabs(x_next[i] - x_prev[i]);
             errmax = errmax > newerr ? errmax : newerr;
         }
-        // TODO: COMMUNICATION ON RESULT VECTOR & ERRMAX
-        for (int i = 0; i < mpi_rank_; i++)
+        
+        MPIArraySync(x_next, ntrim, mpi_size_, mpi_rank_);
+        MPIGatherMax(&errmax, mpi_size_, mpi_rank_);
         double *ptmp = x_prev;                                                  // swap two vectors
         x_prev = x_next;
         x_next = ptmp;
-        std::cout << "Iteration round #" << iter_cnt << ", maximum error: " << errmax << "\n";
+        if(mpi_rank_ == 0) std::cout << "Iteration round #" << iter_cnt << ", maximum error: " << errmax << "\n";
         iter_err_array[iter_cnt - 1] = errmax;
-    } while (errmax >= err_threshold || &aux_vector1 != x_next);                // only exits iteration when the original field is updated
+    } while (errmax >= err_threshold || aux_vector1 == x_next);                 // only exits iteration when the original field is updated
 
     #define TRI(i, j, k) (((k) - 1) * nltrim + ((j) - 1) * nxtrim + (i) - 1)    // trimmed indices
     for (int i = 1; i <= nxtrim; i++)
         for (int j = 1; j <= nytrim; j++)
-            for (int k = 1; k <= nztrim; k++) res_container(i, j, k) = (*x_next)(TRI(i, j, k));
+            for (int k = 1; k <= nztrim; k++) res_container(i, j, k) = x_next[TRI(i, j, k)];
     #undef TRI
 
-    char *buffer = new char[256];
-    MemSizeOutput(buffer);
-    delete[] buffer;
+    // char *buffer = new char[256];
+    // MemSizeOutput(buffer);
+    // delete[] buffer;
     delete[] aux_vector1;
     delete[] aux_vector2;
     return iter_cnt;
 }
 
 void MDebyeSolver::RhsInput (MField3D const & field) {
-    int nx = field.Nx(), ny = field.Ny(), nz = field.Nz();
+    int nx = field.Nx(), ny = field.Ny(), nz = field.Nz(), n = nx * ny * nz;
     int nxtrim = nx - 2, nytrim = ny - 2, nztrim = nz - 2, nltrim = nxtrim * nytrim, ntrim = nxtrim * nytrim * nztrim;
-    if (pfield_) delete pfield_;
-    pfield_ = new double(ntrim, 1);
+    if (pfield_) delete[] pfield_;
+    pfield_ = new double[ntrim];
 
     #define TRI(i, j, k) (((k) - 1) * nltrim + ((j) - 1) * nxtrim + (i) - 1)    // trimmed indices
     for (int i = 1; i <= nxtrim; i++)

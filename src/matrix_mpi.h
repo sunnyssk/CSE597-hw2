@@ -35,6 +35,8 @@ protected:
     static int mpi_size_;
     static int mpi_rank_;
     static MPI_Datatype mpi_type_;
+    static bool initialized_;
+
     int rows_;
     int cols_;
     int slice_rows_;
