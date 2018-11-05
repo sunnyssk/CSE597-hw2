@@ -55,7 +55,7 @@ Then you can run the program with
 
 or
 
-`mpirun -np=N HW_ROOT_FOLDER/mpi/bin/MPIJacobi` (parallel version)
+`mpirun -np N HW_ROOT_FOLDER/mpi/bin/MPIJacobi` (parallel version)
 
 with `N` being the number of processes you desire.
 
