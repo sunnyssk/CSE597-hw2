@@ -191,7 +191,7 @@ From the plot, it could be seen that \texttt{-np=8} should be used for speed for
 
 If we take $p \approx 100\%$ from the profile of serial code, then Amdahl's law could be written as
 
-\[S=\frac{t_\mathrm{serial}}{t_\mathrm{parallel}} \approx s = \max{(N_\mathrm{processes}, N_\mathrm{cores})}.\]
+\[S=\frac{t_\mathrm{serial}}{t_\mathrm{parallel}} \approx s = \min{(N_\mathrm{processes}, N_\mathrm{cores})}.\]
 
 However, this is only possible if no communication cost, which could even arise (seen from above), is considered. 
 
