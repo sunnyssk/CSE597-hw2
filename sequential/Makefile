@@ -8,7 +8,7 @@ NAME = MPIJacobi
 
 CC = tau_cxx.sh    # for profiling
 # CC = g++    # for regular executing
-CFLAGS = -O2 -mfma -mavx -std=c++11 -Wno-unused-result -g
+CFLAGS = -O3 -mfma -mavx -std=c++11 -Wno-unused-result -g
 LFLAGS = -lm
 
 SRCPATH = ./src
