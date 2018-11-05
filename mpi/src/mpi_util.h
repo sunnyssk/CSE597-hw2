@@ -6,6 +6,9 @@
 // Synchronizes elements in an array with length of (size) distributed on different processes.
 void MPIArraySync (double * array, int size, int mpi_size, int mpi_rank);
 
+// Synchronizes elements in an array with length of (size) distributed on different processes, with all-gatherv method.
+void MPIArraySyncAllGatherv (double * src, double * tar, int size, int mpi_size, int mpi_rank);
+
 // Gathers the values in (target) on all processes and finds the maximum. Target will be modified to this maximum value.
 void MPIGatherMax (double * target, int mpi_size, int mpi_rank);
 

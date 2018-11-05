@@ -79,7 +79,7 @@ int MDebyeSolver::JacobiIterativeSolve (double err_threshold, MField3D & res_con
     int iter_cnt = 0;
     int slice_rows = pAmat_->SliceRows(), slice_offset = pAmat_->SliceOffset();
 
-    double *aux_vector1 = new double[ntrim], *aux_vector2 = new double[ntrim];
+    double *aux_vector1 = new double[ntrim], *aux_vector2 = new double[ntrim], *buffer = new double[ntrim];
     double *x_prev = aux_vector1, *x_next = aux_vector2;
     double errmax = 0.0;
 
@@ -108,7 +108,9 @@ int MDebyeSolver::JacobiIterativeSolve (double err_threshold, MField3D & res_con
             errmax = errmax > newerr ? errmax : newerr;
         }
         
-        MPIArraySync(x_next, ntrim, mpi_size_, mpi_rank_);
+        // MPIArraySync(x_next, ntrim, mpi_size_, mpi_rank_);
+        MPIArraySyncAllGatherv(x_next, buffer, ntrim, mpi_size_, mpi_rank_);
+        for (int i = 0; i < ntrim; i++) x_next[i] = buffer[i];
         MPIGatherMax(&errmax, mpi_size_, mpi_rank_);
         double *ptmp = x_prev;                                                  // swap two vectors
         x_prev = x_next;
@@ -129,6 +131,7 @@ int MDebyeSolver::JacobiIterativeSolve (double err_threshold, MField3D & res_con
     // delete[] buffer;
     delete[] aux_vector1;
     delete[] aux_vector2;
+    delete[] buffer;
     return iter_cnt;
 }
 
