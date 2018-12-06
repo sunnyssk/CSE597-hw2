@@ -1,7 +1,7 @@
 #ifndef _MPI_UTIL_H_
 #define _MPI_UTIL_H_
 
-#include <mpi.h>
+#include "mpi.h"
 
 // Synchronizes elements in an array with length of (size) distributed on different processes.
 void MPIArraySync (double * array, int size, int mpi_size, int mpi_rank);
